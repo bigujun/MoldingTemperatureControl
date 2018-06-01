@@ -10,10 +10,15 @@
 
 #include <Arduino.h>
 #include <Wire.h>
-#include <LiquidCrystal_I2C.h>
+#include <LiquidCrystal_PCF8574.h>
 #include "PinsController.h"
 #include <JC_Button.h>
-#include <LiquidMenu.h>
+#include <menu.h>//menu macros and objects
+#include <menuIO/PCF8574Out.h>//arduino I2C LCD
+#include <menuIO/serialOut.h>
+#include <menuIO/chainStream.h>
+#include <menuIO/serialIn.h>
+#include <menuIO/softKeyIn.h>
 
 #define START_DALAY 1000
 
@@ -29,8 +34,8 @@ public:
         struct Calibrate{
                 long in_min;
                 long in_max;
-                long out_max;
                 long out_min;
+                long out_max;
         }calibrate{0,1023,0,1023};
 
         Termopar(uint8_t _pin){
@@ -152,100 +157,59 @@ private:
 
 }controlador;
 
-//CONFIG
 
-class ConfigHelper{
-public:
-        class ConfigNumber{
-        public:
-                ConfigNumber(char* _name, long* _value){};
-                const char* name;
-                const long* value;
+//---MENU-------------
+using namespace Menu;
+#define MAX_DEPTH 2
+keyMap encBtn_map[]={   {-PINS::BTN1,defaultNavCodes[downCmd].ch},
+                        {-PINS::BTN2,defaultNavCodes[upCmd].ch},
+                        {-PINS::BTN3,defaultNavCodes[enterCmd].ch}
+                };//negative pin numbers use internal pull-up, this is on when low
+softKeyIn<3> encButton(encBtn_map);//3 is the number of keys
 
-                void up(){
-                        value++;
-                }
-                void down(){
-                        value--;
-                }
-        };
+LiquidCrystal_PCF8574 lcd(0x3F);
 
-        ConfigNumber termoparOutMin =  ConfigNumber((char*)"TempOutMIN", &termopar.calibrate.out_min);
-        ConfigNumber termoparOutMax =  ConfigNumber((char*)"TempOutMAX", &termopar.calibrate.out_max);
-        ConfigNumber temperaturaObjetivo =  ConfigNumber((char*)"TempObj", &controlador.rampa.temp_c);
-        ConfigNumber tempoObjetivo =  ConfigNumber((char*)"TimeObj", &controlador.rampa.time_s);
-
-        const char*
-
-        static void up(){
-                // atual->up();
-        }
-        static void down(){
-                // atual->down();
-        }
-        static void enter(){
-
-        }
-};
-
-//---TELAS--------------
-
-LiquidLine start1(1, 0, "LONG PRESS FOR");
-LiquidLine start2(1, 1, "CONFIG");
-
-LiquidScreen startScreen(start1,start2);
-
-LiquidLine main1(1, 0, controlador.screenTemp,"\337C  ", controlador.screenTime);
-LiquidLine main2(1, 1, controlador.screenStatus);
-
-LiquidScreen mainScreen(main1,main2);
+#define LEDPIN LED_BUILTIN
 
 
-LiquidLine configSensor(1, 0, "SEN");
-LiquidLine configLcd(1, 0, "BRILHO LCD");
-LiquidLine configMenu(1,1,"<-- | --> |ENTER");
+int test=50;
 
-// LiquidLine configNumber(1,0,ConfigHelper::atual->name," = ",ConfigHelper::atual->value);
-LiquidLine configNumberMenu(1,1," - | + | SAVE");
+MENU(configSensor, "Sensor Temp", Menu::doNothing, Menu::noEvent, Menu::wrapStyle
+  ,FIELD(termopar.calibrate.in_min,"MinIn","",0,1023,10,1,Menu::doNothing, Menu::noEvent, Menu::noStyle)
+  ,FIELD(termopar.calibrate.out_min,"MinOut","\337C",0,500,10,1,Menu::doNothing, Menu::noEvent, Menu::noStyle)
+  ,FIELD(termopar.calibrate.in_max,"MaxIn","\337C",0,1023,10,1,Menu::doNothing, Menu::noEvent, Menu::noStyle)
+  ,FIELD(termopar.calibrate.out_max,"MaxOut","",0,500,10,1,Menu::doNothing, Menu::noEvent, Menu::noStyle)
+  ,EXIT("<Back")
+);
 
-LiquidScreen configScreen(config1,configMenu);
+MENU(mainMenu, "Configurações", Menu::doNothing, Menu::noEvent, Menu::wrapStyle
+  ,FIELD(controlador.rampa.time_s,"Tempo","s",0,3600,60,1, Menu::doNothing, Menu::noEvent, Menu::noStyle)
+  ,FIELD(controlador.rampa.temp_c,"Temperatura","\337C",0,500,10,1,Menu::doNothing, Menu::noEvent, Menu::noStyle)
+  ,SUBMENU(configSensor)
+  ,EXIT("<Back")
+);
 
-// LiquidLine analogReading_line(0, 0, "Analog: ", termopar.read());
-// LiquidScreen secondary_screen(analogReading_line);
-LiquidCrystal_I2C lcd(0x3F,16,2);
-const byte startingScreen = 1;
-LiquidMenu menu(lcd,startingScreen);
+serialIn serial(Serial);
+MENU_INPUTS(in,&serial,&encButton);
 
-enum FunctionsTypes{
-        up,down,enter,longUp,longDown,longEnter
-};
+MENU_OUTPUTS(out,MAX_DEPTH
+  ,SERIAL_OUT(Serial)
+  ,LCD_OUT(lcd,{0,0,16,2})//must have 2 items at least
+);
 
-void xxx(){
-        DEBUG_PRINTLN("XXX_UP");
-        configScreen.
-}
+NAVROOT(nav,mainMenu,MAX_DEPTH,in,out);
 
-
-void startMenus(){
-        configNumberMenu.attach_function(FunctionsTypes::up, ConfigHelper::up);
-        configNumberMenu.attach_function(FunctionsTypes::down,ConfigHelper::down);
-        configNumberMenu.attach_function(FunctionsTypes::enter,ConfigHelper::enter);
-        config1.attach_function(FunctionsTypes::up, xxx);
-        configSensor.attach_function(FunctionsTypes::up, xxx);
-        configLcd.attach_function(FunctionsTypes::up, xxx);
-        // main2.attach_function(FunctionsTypes::longEnter, teste);
-        menu.add_screen(startScreen);
-        menu.add_screen(mainScreen);
-        menu.add_screen(configScreen);
-        menu.add_screen(teste);
-        menu.init();
-        menu.update();
-        menu.set_focusPosition(Position::LEFT);
+void startScreen(){
+        lcd.setBacklight(255);
+        lcd.setCursor(0, 0);
+        lcd.print("Tiggu Cooker");
+        lcd.setCursor(0, 1);
+        lcd.print("v:1.0");
         delay(START_DALAY);
-        menu.change_screen(mainScreen);
-        menu.update();
-        menu.switch_focus(true);
+        nav.showTitle=false;
+
 }
+
 
 //-----BOTOES---------
 
@@ -264,31 +228,31 @@ void updateButtons(){
         if(btnUp.wasReleased()){
                 if(upLong){
                         DEBUG_PRINT("LONG_");
-                        menu.call_function(FunctionsTypes::longUp);
+                        // menu.call_function(FunctionsTypes::longUp);
                 }else{
                         DEBUG_PRINT("SHORT_");
-                        menu.call_function(FunctionsTypes::up);
+                        // menu.call_function(FunctionsTypes::up);
                 }
                 DEBUG_PRINTLN("UP");
         }
         if(btnDown.wasReleased()){
                 if(downLong){
                         DEBUG_PRINT("LONG_");
-                        menu.call_function(FunctionsTypes::longDown);
+                        // menu.call_function(FunctionsTypes::longDown);
                 }else{
                         DEBUG_PRINT("SHORT_");
-                        menu.call_function(FunctionsTypes::down);
+                        // menu.call_function(FunctionsTypes::down);
                 }
                 DEBUG_PRINTLN("DOWN");
         }
         if(btnEnter.wasReleased()){
                 if(enterLong){
                         DEBUG_PRINT("LONG_");
-                        menu.call_function(FunctionsTypes::longEnter);
+                        // menu.call_function(FunctionsTypes::longEnter);
                 }else{
                         DEBUG_PRINT("SHORT_");
                         // menu.call_function(FunctionsTypes::enter);
-                        menu.switch_focus(true);
+                        // menu.switch_focus(true);
                 }
                 DEBUG_PRINTLN("ENTER");
         }
@@ -304,16 +268,17 @@ void setup() {
         DEBUG_PRINTLN("STARTING");
         PinsController.setup();
         termopar.begin();
-        lcd.init();
+        lcd.begin(16,2);
         btnUp.begin();
         btnDown.begin();
         btnEnter.begin();
-        startMenus();
+        startScreen();
 }
 
 void loop() {
+        nav.poll();
         updateButtons();
         if(controlador.update()){
-                menu.update();
+                // menu.update();
         }
 }
