@@ -19,9 +19,18 @@
 #include <menuIO/chainStream.h>
 #include <menuIO/serialIn.h>
 #include <menuIO/softKeyIn.h>
+#include <EEPROM.h>
 
 #define START_DALAY 1000
 
+LiquidCrystal_PCF8574 lcd(0x3F);
+
+void updateButtons();
+
+enum TastAtual{
+        CONFIG,
+        PAINEL
+}taskAtual;
 
 //-------SENSOR
 
@@ -80,6 +89,24 @@ public:
                 ERRO,
                 CARREGANDO
         };
+
+        void run(){
+                updateButtons();
+                if(update()){
+                        screen();
+                }
+        }
+
+        void screen(){
+                lcd.clear();
+                lcd.setCursor(0,0);
+                lcd.print(screenTemp);
+                lcd.print("\337C");
+                lcd.setCursor(11,0);
+                lcd.print(screenTime);
+                lcd.setCursor(0,1);
+                lcd.print(screenStatus);
+        }
         void setScreenStatus(Status _status){
                 String out;
                 switch(_status){
@@ -146,8 +173,8 @@ public:
         }
 
         struct Rampa{
-                long time_s;
-                long temp_c;
+                int time_s;
+                int temp_c;
         }rampa;
 private:
         bool runnning=true;
@@ -156,6 +183,66 @@ private:
 
 
 }controlador;
+
+
+//-----SAVE AND LOAD CONFIGS
+
+static const int EEPROM_KEY=8520; //Chave aleatória verificar se já salvou algo
+
+template <class T> int EEPROM_writeAnything(int ee, const T& value)
+{
+    const byte* p = (const byte*)(const void*)&value;
+    unsigned int i;
+    for (i = 0; i < sizeof(value); i++)
+          EEPROM.write(ee++, *p++);
+    return i;
+}
+
+template <class T> int EEPROM_readAnything(int ee, T& value)
+{
+    byte* p = (byte*)(void*)&value;
+    unsigned int i;
+    for (i = 0; i < sizeof(value); i++)
+          *p++ = EEPROM.read(ee++);
+    return i;
+}
+
+struct ConfisToSave{
+        int key;
+        typeof(Controlador::rampa.time_s) time;
+        typeof(Controlador::rampa.temp_c) temp;
+        typeof(Termopar::calibrate.in_min) in_min;
+        typeof(Termopar::calibrate.in_max) in_max;
+        typeof(Termopar::calibrate.out_min) out_min;
+        typeof(Termopar::calibrate.out_max) out_max;
+}configsToSave;
+
+result saveConfigs(eventMask e) {
+
+        configsToSave.key = EEPROM_KEY;
+        configsToSave.time = controlador.rampa.time_s;
+        configsToSave.temp = controlador.rampa.temp_c;
+        configsToSave.in_min = termopar.calibrate.in_min;
+        configsToSave.in_max = termopar.calibrate.in_max;
+        configsToSave.out_min = termopar.calibrate.out_min;
+        configsToSave.out_max = termopar.calibrate.out_max;
+        EEPROM_writeAnything(0, configsToSave);
+        DEBUG_PRINTLN("SAVE");
+        return quit;
+}
+
+void loadConfig(){
+        EEPROM_readAnything(0, configsToSave);
+        if(configsToSave.key == EEPROM_KEY){
+                controlador.rampa.time_s = configsToSave.time;
+                controlador.rampa.temp_c =configsToSave.temp;
+                termopar.calibrate.in_min=configsToSave.in_min;
+                termopar.calibrate.in_max=configsToSave.in_max;
+                termopar.calibrate.out_min=configsToSave.out_min;
+                termopar.calibrate.out_max=configsToSave.out_max;
+        }
+}
+
 
 
 //---MENU-------------
@@ -167,14 +254,14 @@ keyMap encBtn_map[]={   {-PINS::BTN1,defaultNavCodes[downCmd].ch},
                 };//negative pin numbers use internal pull-up, this is on when low
 softKeyIn<3> encButton(encBtn_map);//3 is the number of keys
 
-LiquidCrystal_PCF8574 lcd(0x3F);
+
 
 #define LEDPIN LED_BUILTIN
 
 
 int test=50;
 
-MENU(configSensor, "Sensor Temp", Menu::doNothing, Menu::noEvent, Menu::wrapStyle
+MENU(configSensor, "Sensor Config", Menu::doNothing, Menu::noEvent, Menu::wrapStyle
   ,FIELD(termopar.calibrate.in_min,"MinIn","",0,1023,10,1,Menu::doNothing, Menu::noEvent, Menu::noStyle)
   ,FIELD(termopar.calibrate.out_min,"MinOut","\337C",0,500,10,1,Menu::doNothing, Menu::noEvent, Menu::noStyle)
   ,FIELD(termopar.calibrate.in_max,"MaxIn","\337C",0,1023,10,1,Menu::doNothing, Menu::noEvent, Menu::noStyle)
@@ -184,9 +271,10 @@ MENU(configSensor, "Sensor Temp", Menu::doNothing, Menu::noEvent, Menu::wrapStyl
 
 MENU(mainMenu, "Configurações", Menu::doNothing, Menu::noEvent, Menu::wrapStyle
   ,FIELD(controlador.rampa.time_s,"Tempo","s",0,3600,60,1, Menu::doNothing, Menu::noEvent, Menu::noStyle)
-  ,FIELD(controlador.rampa.temp_c,"Temperatura","\337C",0,500,10,1,Menu::doNothing, Menu::noEvent, Menu::noStyle)
+  ,FIELD(controlador.rampa.temp_c,"Tempera.","\337C",0,500,10,1,Menu::doNothing, Menu::noEvent, Menu::noStyle)
   ,SUBMENU(configSensor)
-  ,EXIT("<Back")
+  ,OP("Salvar Config",saveConfigs,enterEvent)
+  ,EXIT(" <-Sair")
 );
 
 serialIn serial(Serial);
@@ -199,16 +287,6 @@ MENU_OUTPUTS(out,MAX_DEPTH
 
 NAVROOT(nav,mainMenu,MAX_DEPTH,in,out);
 
-void startScreen(){
-        lcd.setBacklight(255);
-        lcd.setCursor(0, 0);
-        lcd.print("Tiggu Cooker");
-        lcd.setCursor(0, 1);
-        lcd.print("v:1.0");
-        delay(START_DALAY);
-        nav.showTitle=false;
-
-}
 
 
 //-----BOTOES---------
@@ -229,6 +307,7 @@ void updateButtons(){
                 if(upLong){
                         DEBUG_PRINT("LONG_");
                         // menu.call_function(FunctionsTypes::longUp);
+
                 }else{
                         DEBUG_PRINT("SHORT_");
                         // menu.call_function(FunctionsTypes::up);
@@ -249,6 +328,8 @@ void updateButtons(){
                 if(enterLong){
                         DEBUG_PRINT("LONG_");
                         // menu.call_function(FunctionsTypes::longEnter);
+                        taskAtual = CONFIG;
+                        nav.idleOff();
                 }else{
                         DEBUG_PRINT("SHORT_");
                         // menu.call_function(FunctionsTypes::enter);
@@ -272,13 +353,32 @@ void setup() {
         btnUp.begin();
         btnDown.begin();
         btnEnter.begin();
-        startScreen();
+
+        lcd.setBacklight(255);
+        lcd.setCursor(0, 0);
+        lcd.print("Tiggu Cooker");
+        lcd.setCursor(0, 1);
+        lcd.print("v:1.0");
+        delay(START_DALAY);
+        nav.showTitle=false;
+        taskAtual = PAINEL;
+        loadConfig();
 }
 
+
 void loop() {
-        nav.poll();
-        updateButtons();
-        if(controlador.update()){
-                // menu.update();
+
+        switch (taskAtual) {
+                case CONFIG:
+                        nav.poll();
+                break;
+                case PAINEL:
+                        controlador.run();
+                break;
+                default:
+                        taskAtual=PAINEL;
+        }
+        if(nav.sleepTask) {
+          taskAtual = PAINEL;
         }
 }
