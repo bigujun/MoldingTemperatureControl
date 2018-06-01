@@ -1,0 +1,29 @@
+{
+    "name": "Button", 
+    "repository": {
+        "url": "https://github.com/JChristensen/Button.git", 
+        "type": "git"
+    }, 
+    "platforms": [
+        "atmelavr"
+    ], 
+    "frameworks": [
+        "arduino"
+    ], 
+    "version": "db8bf3a213", 
+    "authors": [
+        {
+            "maintainer": false, 
+            "name": "Jack Christensen", 
+            "url": "https://github.com/JChristensen", 
+            "email": null
+        }
+    ], 
+    "keywords": [
+        "press", 
+        "button", 
+        "switch"
+    ], 
+    "id": 77, 
+    "description": "Arduino library to debounce button switches, detect presses, releases, and long presses"
+}
