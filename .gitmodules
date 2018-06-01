@@ -1,3 +1,6 @@
 [submodule "lib/LiquidCrystal_PCF8574"]
 	path = lib/LiquidCrystal_PCF8574
 	url = https://github.com/mathertel/LiquidCrystal_PCF8574.git
+[submodule "lib/ArduinoMenu"]
+	path = lib/ArduinoMenu
+	url = https://github.com/neu-rah/ArduinoMenu.git
