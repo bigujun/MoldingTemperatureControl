@@ -20,6 +20,7 @@
 #include <menuIO/serialIn.h>
 #include <menuIO/softKeyIn.h>
 #include <EEPROM.h>
+#include "Thermocouple.h"
 
 #define START_DALAY 1000
 
@@ -34,40 +35,7 @@ enum TastAtual{
 
 //-------SENSOR
 
-class Termopar{
-private:
-        uint8_t pin;
-        uint16_t leituiras = 1000;
-
-public:
-        struct Calibrate{
-                long in_min;
-                long in_max;
-                long out_min;
-                long out_max;
-        }calibrate{0,1023,0,1023};
-
-        Termopar(uint8_t _pin){
-                pin=_pin;
-        }
-
-        void begin(){
-                pinMode(pin,INPUT);
-        }
-
-        float read(){
-                unsigned long value = 0;
-                for(uint16_t i=0;i<leituiras;i++){
-                        value += analogRead(pin);
-                }
-                return map(value/leituiras,calibrate.in_min,calibrate.in_max,calibrate.out_min,calibrate.out_max);
-        }
-
-        void setLeituras(uint16_t _leituras){
-                leituiras = _leituras;
-        }
-
-}termopar(PINS::SENSOR1);
+Thermocouple termopar(PINS::SENSOR1);
 
 
 //----------CONTROLE
@@ -211,10 +179,10 @@ struct ConfisToSave{
         int key;
         typeof(Controlador::rampa.time_s) time;
         typeof(Controlador::rampa.temp_c) temp;
-        typeof(Termopar::calibrate.in_min) in_min;
-        typeof(Termopar::calibrate.in_max) in_max;
-        typeof(Termopar::calibrate.out_min) out_min;
-        typeof(Termopar::calibrate.out_max) out_max;
+        typeof(Thermocouple::calibrate.in_min) in_min;
+        typeof(Thermocouple::calibrate.in_max) in_max;
+        typeof(Thermocouple::calibrate.out_min) out_min;
+        typeof(Thermocouple::calibrate.out_max) out_max;
 }configsToSave;
 
 result saveConfigs(eventMask e) {
@@ -231,6 +199,15 @@ result saveConfigs(eventMask e) {
         return quit;
 }
 
+void defaultConfig(){
+        controlador.rampa.time_s = 5*60;
+        controlador.rampa.temp_c = 110;
+        termopar.calibrate.in_min=0;
+        termopar.calibrate.in_max=1023;
+        termopar.calibrate.out_min=0;
+        termopar.calibrate.out_max=400;
+}
+
 void loadConfig(){
         EEPROM_readAnything(0, configsToSave);
         if(configsToSave.key == EEPROM_KEY){
@@ -240,8 +217,12 @@ void loadConfig(){
                 termopar.calibrate.in_max=configsToSave.in_max;
                 termopar.calibrate.out_min=configsToSave.out_min;
                 termopar.calibrate.out_max=configsToSave.out_max;
+        }else{
+                defaultConfig();
         }
 }
+
+
 
 
 
@@ -263,9 +244,9 @@ int test=50;
 
 MENU(configSensor, "Sensor Config", Menu::doNothing, Menu::noEvent, Menu::wrapStyle
   ,FIELD(termopar.calibrate.in_min,"MinIn","",0,1023,10,1,Menu::doNothing, Menu::noEvent, Menu::noStyle)
-  ,FIELD(termopar.calibrate.out_min,"MinOut","\337C",0,500,10,1,Menu::doNothing, Menu::noEvent, Menu::noStyle)
-  ,FIELD(termopar.calibrate.in_max,"MaxIn","\337C",0,1023,10,1,Menu::doNothing, Menu::noEvent, Menu::noStyle)
-  ,FIELD(termopar.calibrate.out_max,"MaxOut","",0,500,10,1,Menu::doNothing, Menu::noEvent, Menu::noStyle)
+  ,FIELD(termopar.calibrate.out_min,"MinOut","mV",0,5000,10,1,Menu::doNothing, Menu::noEvent, Menu::noStyle)
+  ,FIELD(termopar.calibrate.in_max,"MaxIn","",0,1023,10,1,Menu::doNothing, Menu::noEvent, Menu::noStyle)
+  ,FIELD(termopar.calibrate.out_max,"MaxOut","mV",0,5000,10,1,Menu::doNothing, Menu::noEvent, Menu::noStyle)
   ,EXIT("<Back")
 );
 
@@ -274,6 +255,7 @@ MENU(mainMenu, "Configurações", Menu::doNothing, Menu::noEvent, Menu::wrapStyl
   ,FIELD(controlador.rampa.temp_c,"Tempera.","\337C",0,500,10,1,Menu::doNothing, Menu::noEvent, Menu::noStyle)
   ,SUBMENU(configSensor)
   ,OP("Salvar Config",saveConfigs,enterEvent)
+  ,OP("Padrão Config",defaultConfig,enterEvent)
   ,EXIT(" <-Sair")
 );
 
@@ -348,6 +330,7 @@ void setup() {
         DEBUG_BEGIN(115200);
         DEBUG_PRINTLN("STARTING");
         PinsController.setup();
+        analogReference(INTERNAL);
         termopar.begin();
         lcd.begin(16,2);
         btnUp.begin();
