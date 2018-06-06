@@ -38,14 +38,14 @@ mvToC_coeficients * Thermocouple::selectTable(float mv){
         bool found=false;
         int i;
         for(i=0;i<coefSize;i++){
-                if(mv > coefs[i].mv[MIN] && mv < coefs[i].mv[MAX]){
+                if(mv > mvToC_coefs[i].mv[MIN] && mv < mvToC_coefs[i].mv[MAX]){
                         found = true;
                         break;
                 }
         }
         DEBUG_PRINT("Scale:");
         DEBUG_PRINTLN(found?String(i):String("OUT"));
-        return found? &coefs[i] : nullptr;
+        return found? &mvToC_coefs[i] : nullptr;
 }
 
 void Thermocouple::setReadings(uint16_t _leituras){

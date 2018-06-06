@@ -3,6 +3,8 @@
  * @Date:   2018-06-05T22:16:19-03:00
  * @Email:  andersonj@hotmail.rs
  */
+#ifndef Thermocouple_Tables_h
+#define Thermocouple_Tables_h
 
 // #define TYPE_B true
 // #define TYPE_E true
@@ -23,7 +25,7 @@ struct mvToC_coeficients{
 };
 
 #if TYPE_B
-mvToC_coeficients coefs[2]{
+static mvToC_coeficients mvToC_coefs[2]{
         {
                 {0.291,2.431}
                 ,{250,700}
@@ -42,7 +44,7 @@ mvToC_coeficients coefs[2]{
         }
 };
 #elif TYPE_E
-mvToC_coeficients coefs[5]{
+static mvToC_coeficients mvToC_coefs[5]{
         {
                 {-9.835,-5.237}
                 ,{-270,-100}
@@ -85,7 +87,7 @@ mvToC_coeficients coefs[5]{
         }
 };
 #elif TYPE_J
-mvToC_coeficients coefs[5]{
+static mvToC_coeficients mvToC_coefs[5]{
         {
                 {-8.095,0.000}
                 ,{-210,0}
@@ -128,7 +130,7 @@ mvToC_coeficients coefs[5]{
         }
 };
 #elif TYPE_K
-mvToC_coeficients coefs[5]{
+static mvToC_coeficients mvToC_coefs[5]{
         {
                 {-6.404,-3.554}
                 ,{-250,-100}
@@ -172,7 +174,7 @@ mvToC_coeficients coefs[5]{
         }
 };
 #elif TYPE_N
-mvToC_coeficients coefs[3]{
+static mvToC_coeficients mvToC_coefs[3]{
         {
                 {-4.313,0.000}
                 ,{-250,0}
@@ -199,7 +201,7 @@ mvToC_coeficients coefs[3]{
         }
 };
 #elif TYPE_R
-mvToC_coeficients coefs[4]{
+static mvToC_coeficients mvToC_coefs[4]{
         {
                 {-0.226,1.469}
                 ,{-50,200}
@@ -234,7 +236,7 @@ mvToC_coeficients coefs[4]{
 }
 };
 #elif TYPE_S
-mvToC_coeficients coefs[4]{
+static mvToC_coeficients mvToC_coefs[4]{
         {
                 {-0.236,1.441}
                 {,-50.000,200.000}
@@ -269,7 +271,7 @@ mvToC_coeficients coefs[4]{
         }
 };
 #elif TYPE_T
-mvToC_coeficients coefs[4]{
+static mvToC_coeficients mvToC_coefs[4]{
         {
                 {-6.18,-4.648}
                 ,{-250,-150}
@@ -303,4 +305,6 @@ mvToC_coeficients coefs[4]{
                 ,{-4.8095795E-02,-4.7352054E-03,0.0000000E+00}
         }
 };
+#endif
+
 #endif
